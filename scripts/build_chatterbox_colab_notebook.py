@@ -289,46 +289,52 @@ def build_notebook() -> dict[str, object]:
 
             os.chdir(REPO_PATH)
 
+            def pip_install(*args):
+                subprocess.run([sys.executable, "-m", "pip", "install", *args], check=True)
+
+            def ensure_import(import_name, *install_args):
+                try:
+                    __import__(import_name)
+                    print(f"Verified Python module: {import_name}")
+                except ModuleNotFoundError:
+                    if not install_args:
+                        raise
+                    print(f"Missing Python module '{import_name}'. Installing recovery package...")
+                    pip_install(*install_args)
+                    __import__(import_name)
+                    print(f"Recovered Python module: {import_name}")
+
             apt_packages = ["ffmpeg"]
             if INSTALL_SYSTEM_OCR_TOOLS or CHAPTER_INPUT_KIND in {"auto", "pdf"}:
                 apt_packages.extend(["poppler-utils", "tesseract-ocr"])
 
             subprocess.run(["apt-get", "update"], check=True)
             subprocess.run(["apt-get", "install", "-y", *apt_packages], check=True)
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"],
-                check=True,
-            )
+            pip_install("--upgrade", "pip", "setuptools", "wheel")
 
             if PIN_TORCH_TO_OFFICIAL_VERSION:
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "--upgrade", "torch==2.6.0", "torchaudio==2.6.0"],
-                    check=True,
-                )
+                pip_install("--upgrade", "torch==2.6.0", "torchaudio==2.6.0")
             else:
                 print("Reusing the runtime's existing torch/torchaudio installation.")
 
-            subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.colab.txt"], check=True)
+            pip_install("-r", "requirements.colab.txt")
+            ensure_import(
+                "perth",
+                "resemble-perth @ git+https://github.com/resemble-ai/Perth.git@master",
+            )
 
             if USE_OFFICIAL_GITHUB_SOURCE:
-                subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "pip",
-                        "install",
-                        "--no-deps",
-                        f"git+https://github.com/resemble-ai/chatterbox.git@{OFFICIAL_CHATTERBOX_REF}",
-                    ],
-                    check=True,
+                pip_install(
+                    "--no-deps",
+                    f"git+https://github.com/resemble-ai/chatterbox.git@{OFFICIAL_CHATTERBOX_REF}",
                 )
                 print(f"Installed official Chatterbox source from {OFFICIAL_CHATTERBOX_REF}.")
             else:
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "--no-deps", OFFICIAL_CHATTERBOX_PACKAGE],
-                    check=True,
-                )
+                pip_install("--no-deps", OFFICIAL_CHATTERBOX_PACKAGE)
                 print(f"Installed official Chatterbox package: {OFFICIAL_CHATTERBOX_PACKAGE}")
+
+            ensure_import("perth", "resemble-perth @ git+https://github.com/resemble-ai/Perth.git@master")
+            ensure_import("chatterbox")
             """
         )
     )
