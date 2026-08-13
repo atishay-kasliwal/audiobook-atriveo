@@ -9,6 +9,11 @@ This project is designed for a split workflow:
 5. Run generation on a GPU.
 6. Save manifests and audio outputs to Google Drive.
 
+The notebook supports both:
+
+- text chapter files such as `.txt`
+- scanned or image-based `.pdf` chapter files that need OCR
+
 ## Current Repository State
 
 When this integration was added, the workspace did not contain an existing Python package, notebook, text pipeline, dependency file, or git metadata. The current structure was created as a clean additive baseline for the Colab workflow.
@@ -86,9 +91,12 @@ Generated segments and manifests are written immediately so you can resume after
 
 Set these notebook variables near the top:
 
-- `REPOSITORY_URL`
+- `GITHUB_OWNER`
+- `GITHUB_REPO`
 - `BRANCH_NAME`
 - `PRIVATE_REPOSITORY = False`
+
+The notebook builds `REPOSITORY_URL` automatically from `GITHUB_OWNER` and `GITHUB_REPO`, unless you explicitly set `REPOSITORY_URL_OVERRIDE`.
 
 Then run the repository sync cell. The notebook will clone the repository if it does not exist yet, or fetch and reset the local Colab checkout to the requested branch when it already exists.
 
@@ -119,6 +127,26 @@ Reference clip guidance:
 
 The notebook validates file existence, duration, readability, clipping, and supported format before generation begins.
 
+## Choosing The Chapter Input
+
+The notebook now accepts:
+
+1. Plain text chapter files such as `chapter_001.txt`
+2. PDF chapter files such as `test1.pdf`
+
+Recommended Drive paths:
+
+- `MyDrive/AudiobookProject/books/<book-id>/chapter_001.txt`
+- `MyDrive/AudiobookProject/books/<book-id>/test1.pdf`
+
+If you use a PDF:
+
+- set `CHAPTER_FILE` to the PDF path relative to `OUTPUT_DIRECTORY`, for example `books/demo-book/test1.pdf`
+- leave `CHAPTER_INPUT_KIND = "auto"` or set it to `"pdf"`
+- keep `FORCE_PDF_OCR = True` for scanned PDFs
+
+The notebook uses `pdftotext` first, then falls back to OCR with `pdftoppm` and `tesseract` when direct extraction is weak.
+
 ## Generating A Smoke Test
 
 Before generating a chapter, run the smoke test cell. It synthesizes one short sentence and saves the result as a quick sanity check for:
@@ -134,14 +162,15 @@ This lets you catch configuration issues before processing a full chapter.
 
 The chapter flow is:
 
-1. Choose the chapter text file.
-2. Clean the text.
-3. Preview paragraph-based segments.
-4. Prepare or resume the manifest.
-5. Generate missing segments with retry handling.
-6. Validate the manifest state.
-7. Assemble the final chapter audio.
-8. Export WAV and optional MP3 or M4B when `ffmpeg` is available.
+1. Choose the chapter text file or PDF.
+2. If needed, OCR the PDF into chapter text.
+3. Clean the text.
+4. Preview paragraph-based segments.
+5. Prepare or resume the manifest.
+6. Generate missing segments with retry handling.
+7. Validate the manifest state.
+8. Assemble the final chapter audio.
+9. Export WAV and optional MP3 or M4B when `ffmpeg` is available.
 
 Important behavior:
 
@@ -196,6 +225,12 @@ You can download them directly from Drive or keep them there for later batch pro
 
 - Open the manifest summary cell and inspect failed or missing segment ids.
 - Regenerate those segments before rerunning the assembly cell.
+
+`PDF text extraction looks wrong`
+
+- Keep `FORCE_PDF_OCR = True` for scanned PDFs.
+- Lower `MINIMUM_OCR_PAGE_WORDS` if valid low-text pages are being skipped.
+- Enable `KEEP_LOW_TEXT_PDF_PAGES = True` if you want every OCR page kept.
 
 ## Supported Languages
 
